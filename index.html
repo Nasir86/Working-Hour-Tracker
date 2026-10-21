@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Work Hours Tracker</title>
+<style>
+:root{--bg:#eef1f4;--card:#fff;--ink:#1d2a3a;--mute:#5d6b7c;--line:#d3dae2;--accent:#0f766e;--accent-ink:#fff;--field:#f7f9fb;--danger:#b42318}
+@media (prefers-color-scheme:dark){:root{--bg:#121820;--card:#1a232e;--ink:#e6ecf2;--mute:#93a1b2;--line:#2c3947;--accent:#2dd4bf;--accent-ink:#06201d;--field:#141c25;--danger:#f97066}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:24px 16px 48px}
+main{max-width:1100px;margin:0 auto}
+h1{font-size:1.5rem;margin:0 0 4px}
+p.sub{margin:0 0 20px;color:var(--mute)}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:16px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mute)}
+input,select,button{font:inherit;color:var(--ink)}
+input,select{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:7px 12px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.x{border:0;background:none;color:var(--mute);padding:4px 8px;font-size:1.1rem}
+button.x:hover{color:var(--danger)}
+.sheet{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:900px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{font-size:.85rem;font-weight:600;color:var(--mute);background:var(--field)}
+td input,td select{width:100%}
+td.hrs{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+td.hrs.bad{color:var(--danger);font-weight:400;font-size:.85rem;white-space:normal}
+tfoot td{font-weight:700;border-bottom:0;background:var(--field)}
+.empty{padding:28px;text-align:center;color:var(--mute)}
+h2{font-size:1.1rem;margin:28px 0 10px}
+.sum td:last-child,.sum th:last-child{text-align:right}
+.sum table{min-width:0}
+.sum tr.cur td{background:var(--field);font-weight:600}
+.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+[hidden]{display:none!important}
+#auth{max-width:380px;margin:8vh auto 0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:24px}
+#auth form{display:flex;flex-direction:column;gap:12px}
+#auth .row{display:flex;gap:8px}
+#auth .row button{flex:1}
+#authmsg{min-height:1.3em;margin:0;font-size:.9rem;color:var(--danger)}
+#auth small{display:block;margin-top:14px;color:var(--mute)}
+.top{display:flex;justify-content:space-between;align-items:start;gap:12px;flex-wrap:wrap}
+.who{display:flex;align-items:center;gap:10px;color:var(--mute)}
+@media print{.top .who,.bar button,.actions,button.x,.sumwrap{display:none}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<main>
+  <section id="auth">
+    <h1>Work Hours Tracker</h1>
+    <p class="sub">Sign in to open your hours.</p>
+    <form id="authform">
+      <label class="f">Username <input id="user" autocomplete="username" required></label>
+      <label class="f">Password <input id="pass" type="password" autocomplete="current-password" required></label>
+      <p id="authmsg" role="alert"></p>
+      <div class="row">
+        <button class="primary" id="signin" type="submit">Sign in</button>
+        <button id="signup" type="button">Create account</button>
+      </div>
+    </form>
+    <small>Accounts live in this browser only. Your hours are encrypted with your password, so a forgotten password cannot be recovered.</small>
+  </section>
+
+  <div id="app" hidden>
+  <div class="top">
+    <div>
+      <h1>Work Hours Tracker</h1>
+      <p class="sub">Working hours = finish − start − lunch break.</p>
+    </div>
+    <div class="who"><span id="who"></span><button id="out">Sign out</button></div>
+  </div>
+
+  <div class="bar">
+    <label class="f">Month <input type="month" id="month"></label>
+    <button class="primary" id="add">Add day</button>
+    <button id="csv">Download CSV</button>
+    <button id="print">Print</button>
+  </div>
+
+  <div class="sheet">
+    <table>
+      <thead><tr>
+        <th>Day</th><th>Date</th><th>Work place</th><th>Start time</th><th>Finishing time</th>
+        <th>Lunch start</th><th>Lunch finish</th><th>Working hours</th><th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+      <tfoot><tr><td colspan="7">Total working hours (<span id="mlabel"></span>)</td><td id="total" colspan="2"></td></tr></tfoot>
+    </table>
+    <div class="empty" id="empty">No entries for this month yet. Choose “Add day” to start.</div>
+  </div>
+
+  <div class="sumwrap">
+    <h2>Monthly totals</h2>
+    <div class="sheet sum"><table>
+      <thead><tr><th>Month</th><th>Days worked</th><th>Total hours</th></tr></thead>
+      <tbody id="summary"></tbody>
+    </table></div>
+  </div>
+  </div>
+</main>
+
+<script>
+const KEY = "workhours.v1";
+const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const $ = id => document.getElementById(id);
+let data = {};
+let session = null; // { user, key, salt } while signed in
+
+// Each account's data is encrypted (AES-GCM) with a key derived from the password (PBKDF2).
+// No password or hash is stored anywhere; a wrong password simply fails to decrypt.
+const enc = new TextEncoder(), dec = new TextDecoder();
+const b64 = buf => { let s = ""; new Uint8Array(buf).forEach(b => s += String.fromCharCode(b)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const ukey = u => "workhours.user." + u;
+
+async function deriveKey(pw, salt) {
+  const base = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 310000, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function seal() {
+  if (!session) return;
+  const { user, key, salt } = session, json = JSON.stringify(data);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(json));
+  try { localStorage.setItem(ukey(user), JSON.stringify({ salt: b64(salt), iv: b64(iv), ct: b64(ct) })); } catch (e) {}
+}
+const save = () => { seal(); };
+
+async function signIn(user, pw) {
+  const bad = new Error("Wrong username or password.");
+  let rec; try { rec = JSON.parse(localStorage.getItem(ukey(user))); } catch (e) {}
+  if (!rec) throw bad;
+  const salt = unb64(rec.salt), key = await deriveKey(pw, salt);
+  try {
+    data = JSON.parse(dec.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(rec.iv) }, key, unb64(rec.ct))));
+  } catch (e) { throw bad; }
+  session = { user, key, salt };
+}
+async function register(user, pw) {
+  if (localStorage.getItem(ukey(user))) throw new Error("That username is already taken on this device.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  session = { user, key: await deriveKey(pw, salt), salt };
+  data = {};
+  try { const old = JSON.parse(localStorage.getItem(KEY)); if (old) { data = old; } } catch (e) {} // adopt entries from the earlier unlocked version
+  await seal();
+  try { localStorage.removeItem(KEY); } catch (e) {}
+}
+const toMin = t => { if (!t) return null; const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+const fmt = m => `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// Returns {mins} or {err} or {} when the row is still incomplete
+function calc(r) {
+  const s = toMin(r.start), e = toMin(r.end), ls = toMin(r.ls), le = toMin(r.le);
+  if (s === null || e === null) return {};
+  if (e <= s) return { err: "Finish must be after start" };
+  let lunch = 0;
+  if (ls !== null || le !== null) {
+    if (ls === null || le === null) return { err: "Enter both lunch times" };
+    if (le < ls) return { err: "Lunch finish is before start" };
+    if (ls < s || le > e) return { err: "Lunch is outside work time" };
+    lunch = le - ls;
+  }
+  return { mins: e - s - lunch };
+}
+
+const monthKey = () => $("month").value;
+const rowsOf = k => data[k] || [];
+const sumOf = k => rowsOf(k).reduce((t, r) => t + (calc(r).mins || 0), 0);
+
+function render() {
+  const k = monthKey(), rows = rowsOf(k);
+  const [y, m] = k.split("-").map(Number);
+  const lo = `${k}-01`, hi = `${k}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+  $("mlabel").textContent = new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
+  $("empty").style.display = rows.length ? "none" : "block";
+
+  $("rows").innerHTML = rows.map((r, i) => {
+    const c = calc(r);
+    const out = c.err ? `<td class="hrs bad">${c.err}</td>` : `<td class="hrs">${c.mins != null ? fmt(c.mins) : ""}</td>`;
+    return `<tr data-i="${i}">
+      <td><select data-f="day"><option value="">Pick day</option>${DAYS.map(d => `<option${d === r.day ? " selected" : ""}>${d}</option>`).join("")}</select></td>
+      <td><input type="date" data-f="date" min="${lo}" max="${hi}" value="${esc(r.date)}"></td>
+      <td><input type="text" data-f="place" value="${esc(r.place)}" placeholder="e.g. Campus"></td>
+      <td><input type="time" data-f="start" value="${esc(r.start)}"></td>
+      <td><input type="time" data-f="end" value="${esc(r.end)}"></td>
+      <td><input type="time" data-f="ls" value="${esc(r.ls)}"></td>
+      <td><input type="time" data-f="le" value="${esc(r.le)}"></td>
+      ${out}
+      <td><button class="x" data-del title="Remove this day" aria-label="Remove this day">×</button></td>
+    </tr>`;
+  }).join("");
+
+  $("total").textContent = `${fmt(sumOf(k))} (${(sumOf(k) / 60).toFixed(2)} hours)`;
+  renderSummary();
+}
+
+function renderSummary() {
+  const keys = Object.keys(data).filter(k => data[k].length).sort().reverse();
+  $("summary").innerHTML = keys.length ? keys.map(k => {
+    const [y, m] = k.split("-").map(Number);
+    const days = data[k].filter(r => calc(r).mins).length;
+    const t = sumOf(k);
+    return `<tr class="${k === monthKey() ? "cur" : ""}"><td>${new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" })}</td><td>${days}</td><td>${fmt(t)} (${(t / 60).toFixed(2)} h)</td></tr>`;
+  }).join("") : `<tr><td colspan="3" class="empty">Totals appear here once you add hours.</td></tr>`;
+}
+
+// Edit a field without re-rendering the inputs (keeps focus), then refresh only the computed cells
+$("rows").addEventListener("change", ev => {
+  const tr = ev.target.closest("tr"); if (!tr || !ev.target.dataset.f) return;
+  const r = rowsOf(monthKey())[tr.dataset.i], f = ev.target.dataset.f;
+  r[f] = ev.target.value;
+  if (f === "date" && r.date) { const [yy, mm, dd] = r.date.split("-").map(Number); r.day = DAYS[new Date(yy, mm - 1, dd).getDay()]; }
+  save(); render();
+});
+$("rows").addEventListener("click", ev => {
+  if (!ev.target.matches("[data-del]")) return;
+  data[monthKey()].splice(ev.target.closest("tr").dataset.i, 1); save(); render();
+});
+
+$("add").onclick = () => {
+  const k = monthKey(); (data[k] = data[k] || []).push({ day: "", date: "", place: "", start: "", end: "", ls: "", le: "" });
+  // Prefill with the previous row's place and times to save typing
+  const rows = data[k], prev = rows[rows.length - 2];
+  if (prev) Object.assign(rows[rows.length - 1], { place: prev.place, start: prev.start, end: prev.end, ls: prev.ls, le: prev.le });
+  save(); render();
+};
+$("month").onchange = render;
+$("print").onclick = () => window.print();
+
+$("csv").onclick = () => {
+  const k = monthKey();
+  const lines = [["Day","Date","Work Place","Start Time","Finishing time","Lunch start","Lunch finish","Working Hours"]]
+    .concat(rowsOf(k).map(r => { const c = calc(r); return [r.day, r.date, r.place, r.start, r.end, r.ls, r.le, c.mins != null ? (c.mins / 60).toFixed(2) : ""]; }));
+  lines.push(["Total","","","","","","", (sumOf(k) / 60).toFixed(2)]);
+  const csv = lines.map(l => l.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = `working-hours-${k}.csv`; a.click(); URL.revokeObjectURL(a.href);
+};
+
+const msg = t => { $("authmsg").textContent = t; };
+
+function startApp() {
+  const now = new Date();
+  $("month").value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  $("who").textContent = `Signed in as ${session.user}`;
+  $("auth").hidden = true; $("app").hidden = false;
+  render(); bump();
+}
+
+function signOut() {
+  session = null; data = {}; clearTimeout(idle);
+  $("rows").innerHTML = ""; $("summary").innerHTML = "";
+  $("app").hidden = true; $("auth").hidden = false;
+  $("user").value = ""; $("pass").value = ""; msg("");
+  $("user").focus();
+}
+
+async function authenticate(fn) {
+  const u = $("user").value.trim().toLowerCase(), p = $("pass").value;
+  if (!window.crypto || !crypto.subtle) return msg("This browser can't encrypt data here. Open the page over https.");
+  if (!/^[a-z0-9._-]{3,32}$/.test(u)) return msg("Username: 3–32 letters, numbers, dot, dash or underscore.");
+  if (fn === register && p.length < 8) return msg("Password must be at least 8 characters.");
+  $("signin").disabled = $("signup").disabled = true; msg("Checking…");
+  try { await fn(u, p); $("pass").value = ""; msg(""); startApp(); }
+  catch (e) { msg(e.message); }
+  $("signin").disabled = $("signup").disabled = false;
+}
+
+// Sign out automatically after 15 minutes without activity
+let idle;
+function bump() { clearTimeout(idle); if (session) idle = setTimeout(signOut, 15 * 60 * 1000); }
+["click", "keydown", "input"].forEach(ev => document.addEventListener(ev, bump));
+
+$("authform").addEventListener("submit", ev => { ev.preventDefault(); authenticate(signIn); });
+$("signup").onclick = () => authenticate(register);
+$("out").onclick = signOut;
+</script>
+</body>
+</html>
